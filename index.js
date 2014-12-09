@@ -2,65 +2,27 @@
 
 var debug = require('debug')('licenses::parse')
   , opensource = require('./opensource')
-  , async = require('async')
-  , url = require('url')
-  , readJson = require('../read-package-json');
-
-var Registry;
+  , async = require('async');
 
 /**
  * Start searching for license information for the given module path.
  *
- * Options:
- *
- * - githulk: A pre-configured githulk instance.
- * - order: The order of resolving license information.
- * - npmjs: A pre-configured npm-registry instance.
- * - registry: A registry to use for the npmjs instance.
- *
- * @param {Mixed} dep The module path or the package.json contents.
- * @param {Object} options Configuration of the parse process.
+ * @param {{
+ *  path: String,
+ *  data: Object
+ * }} dep Absolute path to installed modules AND the package.json contents.
  * @param {Function} fn Callback.
  * @api public
  */
-function parse(dep, options, fn) {
-  if ('function' === typeof options) {
-    fn = options;
-    options = null;
-  }
-
-  //
-  // Fix circular require.
-  //
-  if (!Registry) Registry = require('npm-registry');
-
-  options = options || {};
-  options.githulk = options.githulk || null;
-  options.order = options.order || ['registry', 'github', 'content'];
-  options.registry = options.registy || Registry.mirrors.nodejitsu;
-  options.npmjs = 'string' !== typeof options.registry
-    ? options.registry
-    : new Registry({
-    registry: options.registry || Registry.mirrors.nodejitsu,
-    githulk: options.githulk
-  });
+function parse(dep, fn) {
+  var options = {};
+  options.order = ['packagejson', 'filesystem', 'content'];
 
   async.waterfall([
     //
-    // Make sure that we have the correct contents to start searching for
-    // license information.
-    //
-    function fetch(next) {
-      if ('string' !== typeof dep) return next(undefined, dep);
-//      readJson(path, debug, false, next);
-        return next(undefined, dep);
-//      options.npmjs.packages.get(path, next);
-    },
-
-    //
     // Search for the correct way of parsing out the license information.
     //
-    function search(dep, next) {
+    function search(next) {
       if (!options.order.length) return next();
       if (Array.isArray(dep)) dep = dep[0];
 
@@ -74,7 +36,7 @@ function parse(dep, options, fn) {
 
         debug('attempting to extract the license information using: %s', name);
 
-        parser.parse(dep, options, function parsed(err, license) {
+        parser.parse(dep, function parsed(err, license) {
           if (err) return next();
 
           result = license;
@@ -115,18 +77,18 @@ parse.info = function info(name) {
 // Expose the Parser class so we easily add new parsers through third-party if
 // needed. (Think bitbucket and other code hosting sites)
 //
-parse.Registry = require('./registry'); // Parse license out of package
-parse.Content = require('./content');   // Parse license of out file content.
-parse.Parser  = require('./parser');    // Base parser class.
-parse.Github  = require('./github');    // Parse license info from github.
+parse.Package   = require('./packagejson');   // Parse license out of package
+parse.Content   = require('./content');    // Parse license of out file content.
+parse.Parser    = require('./parser');     // Base parser class.
+parse.FileSystem    = require('./filesystem'); // Parse license info from filesystem.
 
 //
 // Expose our primary parsers that we can leverage to retrieve license content.
 //
 parse.parsers = {};
-parse.parsers.registry  = new parse.Registry(parse.parsers);
-parse.parsers.content   = new parse.Content(parse.parsers);
-parse.parsers.github    = new parse.Github(parse.parsers);
+parse.parsers.packagejson      = new parse.Package(parse.parsers);
+parse.parsers.content          = new parse.Content(parse.parsers);
+parse.parsers.filesystem       = new parse.FileSystem(parse.parsers);
 
 //
 // Expose the actual module.

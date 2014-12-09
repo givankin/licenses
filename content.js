@@ -68,17 +68,6 @@ module.exports = require('./parser').extend({
   },
 
   /**
-   * Is content based license detection an option for this package.
-   *
-   * @param {Object} data The package.json or npm package contents.
-   * @returns {Boolean}
-   * @api public
-   */
-  supported: function supported(data) {
-    return !!this.get(data);
-  },
-
-  /**
    * Retrieve the only possible location of data. Which is the `readme` content
    * but that's only available for packages that are retrieved through npm.
    *

@@ -1,10 +1,9 @@
 'use strict';
 
 var debug = require('debug')('licenses::npm');
-var readJson = require('../read-package-json');
 
 /**
- * Parser for npm based license information.
+ * Parser for package.json based license information.
  *
  * @constructor
  * @api public
@@ -16,23 +15,20 @@ module.exports = require('./parser').extend({
    * @type {String}
    * @private
    */
-  name: 'npm',
+  name: 'packagejson',
 
   /**
-   * Parse the npm license information from the package.
+   * Parse the license information from the package.json contents.
    *
-   * @param {Object} dep The package.json or npm package contents.
-   * @param {Object} options Optional options.
+   * @param {{
+   *  path: String,
+   *  data: Object
+   * }} dep Absolute path to installed modules AND the package.json contents.
    * @param {Function} next Continuation.
    * @api public
    */
-  parse: function parse(dep, options, next) {
+  parse: function parse(dep, next) {
     var parser = this;
-
-    if ('function' === typeof options) {
-      next = options;
-      options = {};
-    }
 
     var matches = [];
     var data = dep.data;
@@ -93,32 +89,6 @@ module.exports = require('./parser').extend({
     if ('type:' in data && data['type:']) return data['type:'];
 
     return;
-  },
-
-  /**
-   * Is npm based license detection an option for this package.
-   *
-   * @param {Object} data The package.json or npm package contents.
-   * @returns {Boolean}
-   * @api public
-   */
-  supported: function supported(data) {
-    return true;
-  },
-
-  /**
-   * Retrieve the possible locations of the license information.
-   *
-   * @param {Object} data The package.json or npm package contents.
-   * @returns {Array}
-   * @api private
-   */
-  get: function get(data) {
-    var parser = this
-      , matches = [];
-
-
-
-    if (matches.length) return matches;
   }
+
 });
