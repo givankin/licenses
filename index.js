@@ -3,12 +3,13 @@
 var debug = require('debug')('licenses::parse')
   , opensource = require('./opensource')
   , async = require('async')
-  , url = require('url');
+  , url = require('url')
+  , readJson = require('../read-package-json');
 
 var Registry;
 
 /**
- * Start searching for license information for the given module name.
+ * Start searching for license information for the given module path.
  *
  * Options:
  *
@@ -17,12 +18,12 @@ var Registry;
  * - npmjs: A pre-configured npm-registry instance.
  * - registry: A registry to use for the npmjs instance.
  *
- * @param {Mixed} name The module name or the package.json contents.
+ * @param {Mixed} dep The module path or the package.json contents.
  * @param {Object} options Configuration of the parse process.
  * @param {Function} fn Callback.
  * @api public
  */
-function parse(name, options, fn) {
+function parse(dep, options, fn) {
   if ('function' === typeof options) {
     fn = options;
     options = null;
@@ -50,19 +51,20 @@ function parse(name, options, fn) {
     // license information.
     //
     function fetch(next) {
-      if ('string' !== typeof name) return next(undefined, name);
-
-      options.npmjs.packages.get(name, next);
+      if ('string' !== typeof dep) return next(undefined, dep);
+//      readJson(path, debug, false, next);
+        return next(undefined, dep);
+//      options.npmjs.packages.get(path, next);
     },
 
     //
     // Search for the correct way of parsing out the license information.
     //
-    function search(data, next) {
+    function search(dep, next) {
       if (!options.order.length) return next();
-      if (Array.isArray(data)) data = data[0];
+      if (Array.isArray(dep)) dep = dep[0];
 
-      debug('searching for licensing information for %s', data.name);
+      debug('searching for licensing information for %s', dep.data.name);
 
       var parser, result, name;
 
@@ -70,11 +72,9 @@ function parse(name, options, fn) {
         name = options.order.shift();
         parser = parse.parsers[name];
 
-        if (!parser.supported(data)) return next();
-
         debug('attempting to extract the license information using: %s', name);
 
-        parser.parse(data, options, function parsed(err, license) {
+        parser.parse(dep, options, function parsed(err, license) {
           if (err) return next();
 
           result = license;

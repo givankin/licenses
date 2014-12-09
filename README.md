@@ -9,7 +9,7 @@ to do `npm install` for your main project before using it.
 * It was not planned by 3rd-eden (see https://github.com/3rd-Eden/licenses/issues/14#issuecomment-57770759).
 
 As I needed to fetch data for all devDependencies, and there were often hundreds
-of them, initial code ran to slow for me.
+of them, initial code ran too slow for me.
 
 ## API differences
 
@@ -69,6 +69,7 @@ licenses({
   console.log(Object.keys(info)); // id,name,full,url,tldr,file,content
   console.log(info.url); // http://opensource.org/licenses/MIT
 });
+```
   
 ### License
 

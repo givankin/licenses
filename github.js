@@ -1,7 +1,8 @@
 'use strict';
 
 var debug = require('debug')('licenses::github')
-  , url = require('url');
+  , url = require('url')
+  , SLASH = require('path').sep;
 
 /**
  * Parser for github based URL.
@@ -42,13 +43,13 @@ module.exports = require('./parser').extend({
   /**
    * Parse the github information from the package.
    *
-   * @param {Object} data The package.json or npm package contents.
+   * @param {Object} dep The package.json or npm package contents.
    * @param {Object} options Optional options.
    * @param {Function} next Continuation.
    * @api public
    */
-  parse: function parse(data, options, next) {
-    data = this.get(data);
+  parse: function parse(dep, options, next) {
+    //dep = this.get(dep);
 
     if ('function' === typeof options) {
       next = options;
@@ -59,78 +60,137 @@ module.exports = require('./parser').extend({
     // We cannot detect a license so we call the callback without any arguments
     // which symbolises a failed attempt.
     //
-    if (!data) return next();
+    if (!dep) return next();
 
-    var githulk = options.githulk || this.githulk
-      , project = data.user +'/'+ data.repo
-      , parser = this;
+    var parser = this;
 
-    githulk.repository.moved(project, function moved(err, github, changed) {
-      if (err) return next(err);
-      if (changed) project = github.user +'/'+ github.repo;
+    var fs = require('fs');
+    fs.readdir(dep.path, function (err, files) {
+      if (err || !files || !files.length) return next(err);
 
-      githulk.repository.contents(project, function contents(err, files) {
-        if (err || !files || !files.length) return next(err);
+      //
+      // Check if we have any compatible.
+      //
+      files = files.filter(function filter(file) {
+        var name = file.toLowerCase();
 
-        //
-        // Check if we have any compatible.
-        //
-        files = files.filter(function filter(file) {
-          var name = file.name.toLowerCase();
+        // Fast case, direct match.
+        if (!!~parser.filenames.indexOf(name)) return true;
 
-          // No size, not really useful for matching.
-          if (file.size <= 0) return false;
-
-          // Fast case, direct match.
-          if (!!~parser.filenames.indexOf(name)) return true;
-
-          // Slow case, partial match.
-          return parser.filenames.some(function some(filename) {
-            return !!~name.indexOf(filename);
-          });
-        }).sort(function sort(a, b) {
-          if (a.name > b.name) return 1;
-          if (b.name < b.name) return -1;
-          return 0;
+        // Slow case, partial match.
+        return parser.filenames.some(function some(filename) {
+          return !!~name.indexOf(filename);
         });
+      }).sort(function sort(a, b) {
+        if (a.name > b.name) return 1;
+        if (b.name < b.name) return -1;
+        return 0;
+      }).map(function(file) {
+        return dep.path + SLASH + file;
+      });
 
-        if (!files.length) return next();
+      if (!files.length) return next();
 
-        //
-        // Stored the matching license.
-        //
-        var license;
+      //
+      // Stored the matching license.
+      //
+      var license;
 
-        //
-        // Fetch and parse the 'raw' content of the file so we can parse it.
-        //
-        parser.async.doWhilst(function does(next) {
-          var file = files.shift();
+      //
+      // Fetch and parse the 'raw' content of the file so we can parse it.
+      //
+      parser.async.doWhilst(function does(next) {
+        var file = files.shift();
 
-          debug('searching %s for license information', file.name);
+        debug('searching %s for license information', file);
 
-          githulk.repository.raw(project, {
-            path: file.name
-          }, function raw(err, data) {
-            if (err) return next(err);
+        fs.readFile(file, {encoding: 'UTF8'}, function raw(err, data) {
+          if (err) return next(err);
 
-            parser.parsers.content.parse({
-              content: Array.isArray(data) ? data[0] : data,
-              file: file.name
-            }, function parse(err, data) {
-              license = data;
+          parser.parsers.content.parse({
+            content: Array.isArray(data) ? data[0] : data,
+            file: file
+          }, function parse(err, data) {
+            license = data;
 
-              if (license) debug('extracted %s from %s', data, file.name);
-              next(err);
-            });
+            if (license) debug('extracted %s from %s', data, file);
+            next(err);
           });
-        }, function select() {
-          return !license && files.length;
-        }, function done(err) {
-          next(err, license);
         });
+      }, function select() {
+        return !license && files.length;
+      }, function done(err) {
+        next(err, license);
       });
     });
+//    return next();
+
+//    githulk.repository.moved(project, function moved(err, github, changed) {
+//      if (err) return next(err);
+//      if (changed) project = github.user +'/'+ github.repo;
+//
+//      githulk.repository.contents(project, function contents(err, files) {
+//        if (err || !files || !files.length) return next(err);
+//
+//        //
+//        // Check if we have any compatible.
+//        //
+//        files = files.filter(function filter(file) {
+//          var name = file.name.toLowerCase();
+//
+//          // No size, not really useful for matching.
+//          if (file.size <= 0) return false;
+//
+//          // Fast case, direct match.
+//          if (!!~parser.filenames.indexOf(name)) return true;
+//
+//          // Slow case, partial match.
+//          return parser.filenames.some(function some(filename) {
+//            return !!~name.indexOf(filename);
+//          });
+//        }).sort(function sort(a, b) {
+//          if (a.name > b.name) return 1;
+//          if (b.name < b.name) return -1;
+//          return 0;
+//        });
+//
+//        if (!files.length) return next();
+//
+//        //
+//        // Stored the matching license.
+//        //
+//        var license;
+//
+//        //
+//        // Fetch and parse the 'raw' content of the file so we can parse it.
+//        //
+//        parser.async.doWhilst(function does(next) {
+//          var file = files.shift();
+//
+//          debug('searching %s for license information', file.name);
+//
+//          githulk.repository.raw(project, {
+//            path: file.name
+//          }, function raw(err, dep) {
+//            if (err) return next(err);
+//
+//            parser.parsers.content.parse({
+//              content: Array.isArray(dep) ? dep[0] : dep,
+//              file: file.name
+//            }, function parse(err, dep) {
+//              license = dep;
+//
+//              if (license) debug('extracted %s from %s', dep, file.name);
+//              next(err);
+//            });
+//          });
+//        }, function select() {
+//          return !license && files.length;
+//        }, function done(err) {
+//          next(err, license);
+//        });
+//      });
+//    });
   },
 
   /**
@@ -153,6 +213,6 @@ module.exports = require('./parser').extend({
    * @api private
    */
   get: function get() {
-    return this.githulk.project.apply(this, arguments);
+    return true;//this.githulk.project.apply(this, arguments);
   }
 });
